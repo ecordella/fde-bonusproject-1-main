@@ -1,0 +1,81 @@
+stages:
+    - prerequisites
+    - clear_caches
+    - test
+    - benchmark
+
+project_private:
+    stage: prerequisites
+    script:
+        - echo "CI_PROJECT_VISIBILITY = $CI_PROJECT_VISIBILITY"
+        - /bin/bash -c 'if [[ $CI_PROJECT_VISIBILITY = "private" ]]; then exit 0; else echo "Set your project visibility to private! Settings -> General -> Visibility -> Project visibility"; exit 1; fi'
+    cache:
+        key: "$CI_JOB_STAGE-$CI_COMMIT_REF_NAME"
+    tags:
+        - "fdedi"
+
+team_file_adapted:
+    stage: prerequisites
+    script:
+        - echo "CI_PROJECT_VISIBILITY = $CI_PROJECT_VISIBILITY"
+        - /bin/bash -c 'line1=$(sed -n 1p team.txt); line2=$(sed -n 2p team.txt); line3=$(sed -n 3p team.txt); error=0; [[ $line1 =~ ^Teamname:.*$ ]] && ! [[ $line1 =~ ^.*YourNameHere.*$ ]] || { echo "Enter your Teamname! You did not change the default value." && error=1; }; [[ $line2 =~ ^Realname:.*$ ]] && ! [[ $line2 =~ ^.*YourNameHere.*$ ]] || { echo "Enter your Realname! You did not change the default value."; error=1; }; [[ $line3 =~ ^MatrNr:.*$ ]] && ! [[ $line3 =~ ^.*YourMatrikelNrHere.*$ ]] || { echo "Enter your MatrNr! You did not change the default value."; error=1; }; if [ $error -ne 0 ]; then echo "Update the team.txt file. Please make sure the prefixes ('Teamname:', 'Realname:', 'MatrNr:') are still correct."; exit 1; else exit 0; fi'
+    cache:
+        key: "$CI_JOB_STAGE-$CI_COMMIT_REF_NAME"
+    tags:
+        - "fdedi"
+
+clear_cache_test:
+    stage: clear_caches
+    script:
+        - rm -rf ./build/*
+    cache:
+        key: "$CI_JOB_STAGE-$CI_COMMIT_REF_NAME"
+        paths:
+            - build/
+        policy: pull-push
+   # when: manual
+    allow_failure: true
+
+clear_cache_benchmark:
+    stage: clear_caches
+    script:
+        - rm -rf ./build/*
+    cache:
+        key: "$CI_JOB_STAGE-$CI_COMMIT_REF_NAME"
+        paths:
+            - build/
+        policy: pull-push
+    #when: manual
+    allow_failure: true
+
+test:
+    stage: test
+    script: 
+        - mkdir -p build/debug
+        - cd build/debug
+        - cmake -DCMAKE_BUILD_TYPE=Debug ../..
+        - make -j8
+        - ./test_all
+    cache:
+        key: "$CI_JOB_STAGE-$CI_COMMIT_REF_NAME"
+        paths:
+            - build/debug
+        policy: pull-push
+    tags:
+        - "fdedi"
+
+benchmark:
+    stage: benchmark
+    script: 
+        - mkdir -p build/release
+        - cd build/release
+        - cmake -DCMAKE_BUILD_TYPE=Release ../..
+        - make -j8
+        - /data/delivery/measure ./main
+    cache:
+        key: "$CI_JOB_STAGE-$CI_COMMIT_REF_NAME"
+        paths:
+            - build/release
+        policy: pull-push
+    tags:
+        - "fdedi"
